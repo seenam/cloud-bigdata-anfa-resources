@@ -1,0 +1,68 @@
+services:
+
+  # ── MinIO : stockage objet compatible S3 ─────────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: anfa-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: anfa-admin
+      MINIO_ROOT_PASSWORD: anfa-password-2026
+    ports:
+      - "9000:9000"   # API S3
+      - "9001:9001"   # Console web MinIO
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      # Vérifie que l'API MinIO répond bien
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - anfa-net
+
+  # ── Jupyter : notebook interactif ────────────────────────────────
+  jupyter:
+    image: jupyter/scipy-notebook:latest
+    container_name: anfa-jupyter
+    environment:
+      JUPYTER_TOKEN: anfa-token
+    ports:
+      - "8888:8888"
+    volumes:
+      # Le dossier notebooks/ local est monté dans le conteneur
+      - ./notebooks:/home/jovyan/work
+    depends_on:
+      minio:
+        condition: service_healthy   # attend que MinIO soit prêt
+    networks:
+      - anfa-net
+
+  # ── anfa-app : notre image custom PySpark ────────────────────────
+  anfa-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: anfa-app
+    restart: "no"    # script batch : s'exécute une fois et se termine
+    volumes:
+      # Monte les données CSV en lecture seule dans le conteneur
+      - ../data/referentiel:/data/referentiel:ro
+    depends_on:
+      minio:
+        condition: service_healthy
+    networks:
+      - anfa-net
+
+# ── Réseau partagé ────────────────────────────────────────────────
+# Jupyter peut appeler http://minio:9000 par le nom de service
+networks:
+  anfa-net:
+    driver: bridge
+
+# ── Volumes persistants ───────────────────────────────────────────
+# minio-data : données MinIO survivent aux docker compose down
+volumes:
+  minio-data:
