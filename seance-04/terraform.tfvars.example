@@ -1,0 +1,13 @@
+# terraform.tfvars.example — modèle à copier vers terraform.tfvars
+# ────────────────────────────────────────────────────────────────
+# 1. Copiez ce fichier : cp terraform.tfvars.example terraform.tfvars
+# 2. Renseignez vos vraies valeurs dans terraform.tfvars
+# 3. Ne committez JAMAIS terraform.tfvars (il est dans .gitignore)
+
+minio_root_password = "REMPLIR_AVEC_VOTRE_MOT_DE_PASSE"
+
+# Optionnel — décommentez pour surcharger les valeurs par défaut
+# minio_root_user    = "anfa-admin"
+# minio_api_port     = 9010
+# minio_console_port = 9011
+# container_name     = "anfa-minio-tf"
