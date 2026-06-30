@@ -1,0 +1,13 @@
+ligne_id,nom,terminus_a,terminus_b,nb_arrets,distance_km,frequence_min
+L01,Ligne 01 - Corniche,Ain Diab,Gare Casa Voyageurs,5,11.2,10
+L02,Ligne 02 - Centre,Ain Sebaa,Place des Nations Unies,6,9.8,8
+L03,Ligne 03 - Nord,Sidi Moumen,Hay Mohammadi,5,14.3,12
+L04,Ligne 04 - Anfa,Anfa Superieur,Port de Casablanca,4,7.6,15
+L05,Ligne 05 - Industrielle,Zone Industrielle Ouled Salah,Maarif,6,16.1,10
+L06,Ligne 06 - Universite,Universite Hassan II,Sidi Bernoussi,5,12.4,20
+L07,Ligne 07 - Roches Noires,Roches Noires,Centre Ville,4,8.9,15
+L08,Ligne 08 - Hay Hassani,Hay Hassani,Ain Chock,5,10.5,12
+L09,Ligne 09 - Oulfa,Oulfa,Derb Sultan,5,13.7,15
+L10,Ligne 10 - Salmia,Salmia,Quartier Polo,4,9.1,20
+L11,Ligne 11 - Beausite,Beausite,Sbata,5,11.8,18
+L12,Ligne 12 - Ben Msik,Ben Msik,Mers Sultan,5,10.2,15

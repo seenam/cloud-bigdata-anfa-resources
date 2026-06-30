@@ -1,0 +1,75 @@
+version: '3.8'
+
+# TP Séance 5 — Cluster Spark standalone + MinIO
+# Services : anfa-minio | anfa-spark-master | anfa-spark-worker-1 | anfa-spark-worker-2
+
+services:
+
+  # ── MinIO : stockage objet S3-compatible ──────────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: anfa-minio
+    ports:
+      - "9000:9000"   # API S3
+      - "9001:9001"   # Console web (http://localhost:9001)
+    environment:
+      MINIO_ROOT_USER: anfa-admin
+      MINIO_ROOT_PASSWORD: anfa-password-2026
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Spark Master ──────────────────────────────────────────────────
+  spark-master:
+    image: apache/spark:3.5.8-python3
+    container_name: anfa-spark-master
+    environment:
+      - SPARK_NO_DAEMONIZE=true
+    ports:
+      - "7077:7077"   # soumission de jobs
+      - "8080:8080"   # UI web du master (http://localhost:8080)
+    command: /opt/spark/sbin/start-master.sh
+    volumes:
+      - ./jobs:/opt/jobs
+      - ./data:/opt/data
+    depends_on:
+      minio:
+        condition: service_healthy
+
+  # ── Spark Worker 1 (1 Go RAM, 1 coeur) ───────────────────────────
+  spark-worker-1:
+    image: apache/spark:3.5.8-python3
+    container_name: anfa-spark-worker-1
+    environment:
+      - SPARK_NO_DAEMONIZE=true
+      - SPARK_WORKER_MEMORY=1G
+      - SPARK_WORKER_CORES=1
+    command: /opt/spark/sbin/start-worker.sh spark://spark-master:7077
+    depends_on:
+      - spark-master
+    volumes:
+      - ./jobs:/opt/jobs
+      - ./data:/opt/data
+
+  # ── Spark Worker 2 (1 Go RAM, 1 coeur) ───────────────────────────
+  spark-worker-2:
+    image: apache/spark:3.5.8-python3
+    container_name: anfa-spark-worker-2
+    environment:
+      - SPARK_NO_DAEMONIZE=true
+      - SPARK_WORKER_MEMORY=1G
+      - SPARK_WORKER_CORES=1
+    command: /opt/spark/sbin/start-worker.sh spark://spark-master:7077
+    depends_on:
+      - spark-master
+    volumes:
+      - ./jobs:/opt/jobs
+      - ./data:/opt/data
+
+volumes:
+  minio-data:

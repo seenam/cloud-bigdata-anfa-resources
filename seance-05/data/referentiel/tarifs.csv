@@ -1,0 +1,6 @@
+type_tarif,prix_normal,prix_reduit,description
+normal,4.0,2.0,Tarif standard
+etudiant,2.0,1.5,Tarif etudiant sur presentation carte
+senior,2.0,1.0,Tarif senior 60 ans et plus
+mensuel,120.0,80.0,Abonnement mensuel toutes lignes
+hebdomadaire,35.0,20.0,Abonnement hebdomadaire
