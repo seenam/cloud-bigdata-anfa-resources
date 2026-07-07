@@ -1,0 +1,115 @@
+x-kafka-common:
+  &kafka-common
+  image: apache/kafka:4.3.1
+  restart: unless-stopped
+  environment:
+    &kafka-common-env
+    KAFKA_PROCESS_ROLES: broker,controller
+    # Quorum KRaft : les 3 noeuds qui participent a la coordination (remplace Zookeeper)
+    KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-1:9093,2@kafka-2:9093,3@kafka-3:9093
+    KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+    KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+    KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+    # Replication : chaque partition repliquee 3 fois, pour survivre a la perte d'un broker
+    KAFKA_DEFAULT_REPLICATION_FACTOR: 3
+    KAFKA_MIN_INSYNC_REPLICAS: 2
+    KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+    KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+    KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+    # Identifiant unique du cluster (UUID base64 valide), partage par les 3 noeuds
+    KAFKA_CLUSTER_ID: "oPDaLQlUQ3Sg_L8LBoc5AA"
+
+services:
+
+  kafka-1:
+    <<: *kafka-common
+    container_name: anfa-kafka-1
+    ports:
+      - "19092:19092"  # port EXTERNE (accessible depuis l'hote)
+    environment:
+      <<: *kafka-common-env
+      KAFKA_NODE_ID: 1
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:19092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-1:9092,EXTERNAL://localhost:19092
+
+  kafka-2:
+    <<: *kafka-common
+    container_name: anfa-kafka-2
+    ports:
+      - "19093:19093"
+    environment:
+      <<: *kafka-common-env
+      KAFKA_NODE_ID: 2
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:19093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-2:9092,EXTERNAL://localhost:19093
+
+  kafka-3:
+    <<: *kafka-common
+    container_name: anfa-kafka-3
+    ports:
+      - "19094:19094"
+    environment:
+      <<: *kafka-common-env
+      KAFKA_NODE_ID: 3
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:19094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-3:9092,EXTERNAL://localhost:19094
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: anfa-kafka-ui
+    restart: unless-stopped
+    ports:
+      - "8085:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: anfa-cluster
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka-1:9092,kafka-2:9092,kafka-3:9092
+    depends_on:
+      - kafka-1
+      - kafka-2
+      - kafka-3
+
+  minio:
+    image: minio/minio:latest
+    container_name: anfa-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: anfa-admin
+      MINIO_ROOT_PASSWORD: anfa-password-2026
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+
+  spark-master:
+    image: apache/spark:3.5.8-python3
+    container_name: anfa-spark-master
+    restart: unless-stopped
+    environment:
+      - SPARK_NO_DAEMONIZE=true
+    ports:
+      - "7077:7077"
+      - "8091:8080"  # UI Spark sur localhost:8091
+    volumes:
+      - ./jobs:/opt/jobs
+    command: >
+      /opt/spark/sbin/start-master.sh
+
+  spark-worker:
+    image: apache/spark:3.5.8-python3
+    container_name: anfa-spark-worker
+    restart: unless-stopped
+    environment:
+      - SPARK_NO_DAEMONIZE=true
+      - SPARK_WORKER_CORES=2
+      - SPARK_WORKER_MEMORY=2g
+    volumes:
+      - ./jobs:/opt/jobs
+    command: >
+      /opt/spark/sbin/start-worker.sh spark://spark-master:7077
+    depends_on:
+      - spark-master
+
+volumes:
+  minio-data:
