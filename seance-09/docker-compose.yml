@@ -48,7 +48,7 @@ services:
     container_name: anfa-freshness-exporter
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "8001:8000"     # 8000 pris par un autre projet local ; le scraping interne reste sur :8000
 
   # ──────────────────────────────────────────────────────
   # Grafana : visualisation et alertes
