@@ -1,49 +1,56 @@
-# Rendu — Séance 7
+# Rendu - Seance 7 : Streaming Kafka et Spark Structured Streaming pour Anfa
 
-**Nom et prénom :** <Votre nom complet>
-**Identifiant GitHub :** <votre-username>
-**Date de soumission :** <JJ/MM/AAAA>
+**Nom :**
+**Identifiant GitHub :**
+**Date :**
 
-## Résumé de la séance
+## Resume
 
-<2-4 lignes : cluster Kafka 3 brokers déployé, flotte de bus simulée en flux continu,
-tolérance aux pannes observée, Spark Structured Streaming consommant et agrégeant le flux vers MinIO.>
+Decrivez en quelques phrases ce que vous avez mis en place pendant cette
+seance : le cluster Kafka a 3 brokers en mode KRaft, le topic
+`anfa-positions-bus`, le producer/consumer de decouverte, le simulateur de
+flotte (100 bus), la demonstration de tolerance aux pannes, et les deux
+jobs Spark Structured Streaming (lecture console puis agregation en
+fenetre ecrite dans MinIO).
 
-## Étapes principales
+## Reflexion personnelle
 
-1. Déploiement du cluster Kafka (3 brokers, mode KRaft) + Kafka UI.
-2. Création du topic `anfa-positions-bus` (3 partitions, réplication 3).
-3. Premier producer/consumer Python pour comprendre la mécanique.
-4. Simulation de 100 bus envoyant leur position en continu.
-5. Démonstration de tolérance aux pannes (arrêt d'un broker).
-6. Spark Structured Streaming : lecture console, puis agrégation en fenêtre vers MinIO.
+Qu'avez-vous compris de l'interet de la cle (`key=bus_id`) dans un topic
+partitionne ? Qu'avez-vous observe lorsque vous avez tue puis redemarre un
+broker Kafka ? En quoi le `checkpointLocation` de Spark Structured
+Streaming joue-t-il un role comparable aux offsets Kafka ?
 
-## Captures d'écran
+## Reponses aux exercices
 
-### 3 brokers actifs dans Kafka UI
-![Brokers actifs](captures/kafka-ui-brokers.png)
+1. Pourquoi le cluster a-t-il survecu a l'arret de `anfa-kafka-2` sans
+   perte de message ni interruption du simulateur ? Quel role jouent
+   `KAFKA_DEFAULT_REPLICATION_FACTOR` et `KAFKA_MIN_INSYNC_REPLICAS` dans
+   cette tolerance aux pannes ?
 
-### Débit de messages en augmentation
-![Débit messages](captures/kafka-ui-debit.png)
+2. Pourquoi le consumer `premier_consumer.py` ne relit-il pas les memes
+   messages lorsqu'on le relance avec le meme `group_id` ? Que faudrait-il
+   changer pour rejouer tout l'historique du topic ?
 
-### Cluster avec 2 brokers sur 3 (après arrêt volontaire)
-![2 brokers sur 3](captures/kafka-ui-2-brokers.png)
+3. A quoi sert le `withWatermark` dans `agregation_streaming.py` ? Que se
+   passerait-il si on l'omettait sur un flux qui tourne indefiniment ?
 
-### Micro-batchs affichés en console par Spark
-![Console Spark Streaming](captures/spark-streaming-console.png)
+## Difficultes rencontrees
 
-### Résultats agrégés dans MinIO
-![MinIO agregats](captures/minio-agregats.png)
+Decrivez les problemes rencontres (demarrage des brokers, ports
+externes/internes, packages Spark manquants, droits MinIO, RAM Docker,
+etc.) et comment vous les avez resolus.
 
-## Réflexion personnelle
+## Captures d'ecran
 
-<3-5 lignes : dans quel cas utiliseriez-vous Kafka + Spark Streaming plutôt que le pipeline batch
-Airflow + Spark vu en séance 5-6 ? Qu'est-ce que la réplication à 3 brokers vous a concrètement montré ?>
+Toutes les captures se trouvent dans `captures/` :
 
-## Réponses aux exercices d'application
-
-<À compléter d'après les énoncés fournis avec l'assignment.>
-
-## Difficultés rencontrées
-
-<Aucune | Décrivez brièvement.>
+- `kafka-ui-brokers.png` : liste des 3 brokers actifs dans Kafka UI
+  (point de verification 1).
+- `kafka-ui-debit.png` : Kafka UI montrant le debit de messages en
+  augmentation pendant que le simulateur tourne (point de verification 4).
+- `kafka-ui-2-brokers.png` : Kafka UI montrant 2 brokers actifs sur 3
+  apres l'arret volontaire de `anfa-kafka-2` (point de verification 5).
+- `spark-streaming-console.png` : 2-3 micro-batchs affiches en console
+  par `lecture_flux_console.py` (point de verification 6).
+- `minio-agregats.png` : structure du dossier `agregats_par_ligne/` dans
+  le bucket MinIO `anfa-streaming` (point de verification 6 final).

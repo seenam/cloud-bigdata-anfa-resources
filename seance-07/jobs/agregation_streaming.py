@@ -1,70 +1,90 @@
 """
 agregation_streaming.py
-─────────────────────────
-Consomme le flux de positions GPS, calcule des agrégats par fenêtre
-de 30 secondes et par ligne, et écrit les résultats dans MinIO.
+
+Deuxieme job Spark Structured Streaming : agrege le flux de positions GPS
+en fenetres temporelles de 30 secondes (nombre de positions recues et
+vitesse moyenne, par ligne), puis ecrit le resultat en Parquet dans MinIO
+(s3a://anfa-streaming/agregats_par_ligne/).
+
+Pre-requis MinIO (voir 6.2 du TP) : la cle applicative anfa-app-key doit
+exister, et le bucket anfa-streaming doit etre cree.
+
+Soumission (depuis le conteneur anfa-spark-master) :
+
+docker exec anfa-spark-master /opt/spark/bin/spark-submit \
+    --master spark://spark-master:7077 \
+    --conf spark.jars.ivy=/tmp/.ivy2 \
+    --conf spark.driver.extraJavaOptions=-Duser.home=/tmp \
+    --packages "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.8,org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.262" \
+    /opt/jobs/agregation_streaming.py
+
+Laissez tourner 2 a 3 minutes (le temps d'accumuler plusieurs fenetres de
+30 secondes), puis arretez avec Ctrl+C.
 """
-
 from pyspark.sql import SparkSession
-from pyspark.sql.types import StructType, StringType, DoubleType, IntegerType
-from pyspark.sql.functions import col, from_json, window, count, avg, to_timestamp
+from pyspark.sql.functions import avg, col, count, from_json, window
+from pyspark.sql.types import DoubleType, IntegerType, StringType, StructField, StructType
+
+KAFKA_BOOTSTRAP_SERVERS = "kafka-1:9092,kafka-2:9092,kafka-3:9092"
+TOPIC = "anfa-positions-bus"
+
+MINIO_ENDPOINT = "http://minio:9000"
+MINIO_ACCESS_KEY = "anfa-app-key"
+MINIO_SECRET_KEY = "anfa-app-secret-2026"
+
+OUTPUT_PATH = "s3a://anfa-streaming/agregats_par_ligne/"
+CHECKPOINT_PATH = "s3a://anfa-streaming/checkpoints/agregats_par_ligne/"
+
+SCHEMA_POSITION = StructType(
+    [
+        StructField("bus_id", StringType(), True),
+        StructField("ligne_id", StringType(), True),
+        StructField("latitude", DoubleType(), True),
+        StructField("longitude", DoubleType(), True),
+        StructField("vitesse_kmh", IntegerType(), True),
+        StructField("timestamp", StringType(), True),
+    ]
+)
 
 
-def creer_spark_session() -> SparkSession:
+def build_spark_session():
     return (
-        SparkSession.builder
-        .appName("Anfa - Agrégation streaming")
-        .master("spark://spark-master:7077")
-        .config("spark.hadoop.fs.s3a.endpoint", "http://minio:9000")
-        .config("spark.hadoop.fs.s3a.access.key", "anfa-app-key")
-        .config("spark.hadoop.fs.s3a.secret.key", "anfa-app-secret-2026")
+        SparkSession.builder.appName("AnfaAgregationStreaming")
+        .config("spark.hadoop.fs.s3a.endpoint", MINIO_ENDPOINT)
+        .config("spark.hadoop.fs.s3a.access.key", MINIO_ACCESS_KEY)
+        .config("spark.hadoop.fs.s3a.secret.key", MINIO_SECRET_KEY)
         .config("spark.hadoop.fs.s3a.path.style.access", "true")
         .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-        .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
         .config(
-            "spark.jars.packages",
-            "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.8,"
-            "org.apache.hadoop:hadoop-aws:3.3.4,"
-            "com.amazonaws:aws-java-sdk-bundle:1.12.262"
+            "spark.hadoop.fs.s3a.aws.credentials.provider",
+            "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
         )
         .getOrCreate()
     )
 
 
 def main():
-    spark = creer_spark_session()
+    spark = build_spark_session()
     spark.sparkContext.setLogLevel("WARN")
 
-    schema_position = (
-        StructType()
-        .add("bus_id", StringType())
-        .add("ligne_id", StringType())
-        .add("latitude", DoubleType())
-        .add("longitude", DoubleType())
-        .add("vitesse_kmh", IntegerType())
-        .add("timestamp", StringType())
-    )
-
     flux_brut = (
-        spark.readStream
-        .format("kafka")
-        .option("kafka.bootstrap.servers", "kafka-1:9092,kafka-2:9092,kafka-3:9092")
-        .option("subscribe", "anfa-positions-bus")
+        spark.readStream.format("kafka")
+        .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP_SERVERS)
+        .option("subscribe", TOPIC)
         .option("startingOffsets", "latest")
         .load()
     )
 
     positions = (
-        flux_brut
-        .select(from_json(col("value").cast("string"), schema_position).alias("data"))
+        flux_brut.select(
+            from_json(col("value").cast("string"), SCHEMA_POSITION).alias("data")
+        )
         .select("data.*")
-        .withColumn("event_time", to_timestamp(col("timestamp")))
+        .withColumn("event_time", col("timestamp").cast("timestamp"))
     )
 
-    # ── Agrégation par fenêtre de 30 secondes et par ligne ──
     agregats = (
-        positions
-        .withWatermark("event_time", "1 minute")   # tolère 1 min de retard des messages
+        positions.withWatermark("event_time", "1 minute")  # tolere 1 min de retard
         .groupBy(
             window(col("event_time"), "30 seconds"),
             col("ligne_id"),
@@ -75,13 +95,12 @@ def main():
         )
     )
 
-    # ── Écriture en streaming vers MinIO, au format Parquet ──
     requete = (
         agregats.writeStream
+        .outputMode("append")  # chaque fenetre n'est ecrite qu'une fois close
         .format("parquet")
-        .option("path", "s3a://anfa-streaming/agregats_par_ligne/")
-        .option("checkpointLocation", "s3a://anfa-streaming/checkpoints/agregats/")
-        .outputMode("append")
+        .option("path", OUTPUT_PATH)
+        .option("checkpointLocation", CHECKPOINT_PATH)
         .trigger(processingTime="30 seconds")
         .start()
     )
