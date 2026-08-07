@@ -1,13 +1,16 @@
 # Rendu — Séance 9
 
-**Nom et prénom :** <Votre nom complet>
-**Identifiant GitHub :** <votre-username>
-**Date de soumission :** <JJ/MM/AAAA>
+**Nom et prénom :** KUMAKO Seenam Kodjo
+**Identifiant GitHub :** seenam
+**Date de soumission :** 08/07/2026
 
 ## Résumé de la séance
 
-<2-4 lignes : stack Prometheus/Grafana déployée, exportateur de fraîcheur Anfa
-instrumenté, dashboard construit, alerte configurée et déclenchée sur panne simulée.>
+Déploiement d'une stack de monitoring complète (Prometheus, Node Exporter, cAdvisor,
+Grafana) et d'un exportateur métier custom simulant la fraîcheur des données Anfa.
+Exploration des cibles Prometheus et de PromQL, import du dashboard "Node Exporter
+Full", construction d'un panneau jauge dédié à la fraîcheur, configuration d'une
+alerte Grafana et déclenchement de celle-ci via une panne simulée.
 
 ## Étapes principales
 
@@ -31,10 +34,19 @@ instrumenté, dashboard construit, alerte configurée et déclenchée sur panne 
 
 ## Réflexion personnelle
 
-<3-5 lignes : en quoi cette séance répond-elle directement à la situation-problème
-d'Awa dans le CM ? Qu'est-ce que la métrique de fraîcheur vous a permis de voir que
-les autres métriques (CPU, RAM, statut des conteneurs) ne montraient pas ?>
+Cette séance illustre très concrètement la situation-problème d'Awa : pendant toute
+la simulation de panne, `docker compose ps` affichait les 5 services `Up`, sans
+aucune erreur dans les logs des autres conteneurs. Ni le CPU, ni la RAM, ni le statut
+des conteneurs n'auraient permis de détecter que le pipeline avait cessé de produire
+des résultats frais. Seule la métrique métier `anfa_dernier_traitement_timestamp`,
+et la fraîcheur qui en découle, a révélé le problème : un processus qui tourne peut
+très bien ne plus rien accomplir d'utile. Cela montre l'importance de métriques
+métier en plus des métriques d'infrastructure classiques.
 
 ## Difficultés rencontrées
 
-<Aucune | Décrivez brièvement.>
+Le port 8000 par défaut de l'exportateur était déjà utilisé par un autre projet
+local (conteneur `eventculture_api`). Résolu en remappant l'exportateur sur le port
+hôte 8001 (`8001:8000`) dans `docker-compose.yml`, sans impact sur le scraping
+interne par Prometheus qui continue de cibler `anfa-freshness-exporter:8000` sur le
+réseau Docker.
