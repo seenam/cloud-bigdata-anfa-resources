@@ -1,0 +1,42 @@
+# ═══════════════════════════════════════════════════════════════════
+# STAGE 1 — builder
+# Image complète pour installer les dépendances Python
+# Cette image intermédiaire ne sera PAS dans l'image finale
+# ═══════════════════════════════════════════════════════════════════
+FROM python:3.11 AS builder
+
+WORKDIR /build
+COPY requirements.txt .
+
+# --user : installe dans ~/.local au lieu de /usr/local
+# Cela permet de copier uniquement ce dossier dans le stage final
+RUN pip install --user --no-cache-dir -r requirements.txt
+
+
+# ═══════════════════════════════════════════════════════════════════
+# STAGE 2 — image finale (slim)
+# On repart d'une image propre et on copie SEULEMENT ce qui est utile
+# ═══════════════════════════════════════════════════════════════════
+FROM python:3.11-slim-bookworm
+
+# Java est toujours nécessaire (dépendance runtime de PySpark)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends openjdk-17-jre-headless && \
+    rm -rf /var/lib/apt/lists/*
+
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+# ── Copie des dépendances depuis le stage builder ──────────────────
+# On ne copie PAS les outils de build (pip, setuptools, wheel, etc.)
+# Gain : ~50-150 Mo selon les packages
+COPY --from=builder /root/.local /root/.local
+ENV PATH=/root/.local/bin:$PATH
+
+# ── Copie du code ──────────────────────────────────────────────────
+COPY . .
+
+CMD ["python", "analyse_referentiel.py"]

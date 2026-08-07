@@ -1,0 +1,35 @@
+# ── Environnements virtuels Python ───────────────────────────────
+.venv/
+venv/
+env/
+
+# ── Cache Python ──────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# ── Jupyter ───────────────────────────────────────────────────────
+notebooks/
+.ipynb_checkpoints/
+*.ipynb
+
+# ── Git ───────────────────────────────────────────────────────────
+.git/
+.gitignore
+
+# ── Secrets et config locale ──────────────────────────────────────
+.env
+.env.*
+*.env
+
+# ── Captures et rendu ─────────────────────────────────────────────
+captures/
+RENDU.md
+
+# ── Artefacts divers ─────────────────────────────────────────────
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
