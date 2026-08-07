@@ -1,8 +1,8 @@
 # Rendu — Séance 8
 
-**Nom et prénom :** <Votre nom complet>
-**Identifiant GitHub :** <votre-username>
-**Date de soumission :** <JJ/MM/AAAA>
+**Nom et prénom :** Sena Kumako
+**Identifiant GitHub :** seenam
+**Date de soumission :** 08/07/2026
 
 ## Résumé de la séance
 
